@@ -3,26 +3,26 @@
 Welcome to the most comprehensive Docker guide you'll find! This guide covers everything from basic concepts to advanced techniques, making you a Docker expert ready for any real-world scenario.
 
 ## Table of Contents
-1. [Why Docker? The Container Revolution](#why-docker)
-2. [Understanding the Container Landscape](#container-landscape)
-3. [Docker Architecture Deep Dive](#docker-architecture)
+1. [Why Docker? The Container Revolution](#why-docker-the-container-revolution)
+2. [Understanding the Container Landscape](#understanding-the-container-landscape)
+3. [Docker Architecture Deep Dive](#docker-architecture-deep-dive)
 4. [Docker Under the Hood](#docker-under-the-hood)
-5. [Essential Docker Commands](#essential-commands)
-6. [Docker Images Mastery](#docker-images)
-7. [Container Lifecycle Management](#container-lifecycle)
-8. [Docker Networking Complete Guide](#docker-networking)
-9. [Data Persistence with Volumes](#docker-volumes)
-10. [Resource Management & Monitoring](#resource-management)
-11. [Docker Registries & Distribution](#docker-registries)
-12. [Multi-Container Apps with Docker Compose](#docker-compose)
-13. [Advanced Dockerfile Techniques](#advanced-dockerfile)
+5. [Essential Docker Commands](#essential-docker-commands)
+6. [Docker Images Mastery](#docker-images-mastery)
+7. [Container Lifecycle Management](#container-lifecycle-management)
+8. [Docker Networking Complete Guide](#docker-networking-complete-guide)
+9. [Data Persistence with Volumes](#data-persistence-with-volumes)
+10. [Resource Management & Monitoring](#resource-management--monitoring)
+11. [Docker Registries & Distribution](#docker-registries--distribution)
+12. [Multi-Container Apps with Docker Compose](#multi-container-apps-with-docker-compose)
+13. [Advanced Dockerfile Techniques](#advanced-dockerfile-techniques)
 14. [Production Best Practices](#production-best-practices)
-15. [Troubleshooting & Debugging](#troubleshooting)
-16. [Complete Command Reference](#command-reference)
+15. [Troubleshooting & Debugging](#troubleshooting--debugging)
+16. [Complete Command Reference](#complete-command-reference)
 
 ---
 
-## Why Docker? The Container Revolution {#why-docker}
+## Why Docker? The Container Revolution
 
 Docker revolutionized software development and deployment by solving critical problems that plagued developers for decades:
 
@@ -62,7 +62,7 @@ Container-based delivery represents the evolution of application deployment:
 
 ---
 
-## Understanding the Container Landscape {#container-landscape}
+## Understanding the Container Landscape
 
 ### Bare Metal vs VMs vs Containers
 
@@ -93,7 +93,7 @@ Container-based delivery represents the evolution of application deployment:
 
 ---
 
-## Docker Architecture Deep Dive {#docker-architecture}
+## Docker Architecture Deep Dive
 
 Docker follows a client-server architecture with several key components:
 
@@ -138,7 +138,7 @@ docker system df -v
 
 ---
 
-## Docker Under the Hood {#docker-under-the-hood}
+## Docker Under the Hood
 
 Understanding how Docker works internally helps you use it more effectively:
 
@@ -222,7 +222,7 @@ docker commit <container_id> <new_name>:<tag>
 
 ---
 
-## Essential Docker Commands {#essential-commands}
+## Essential Docker Commands
 
 ### Image Operations
 
@@ -323,7 +323,7 @@ docker container prune                 # Remove all stopped containers
 
 ---
 
-## Docker Images Mastery {#docker-images}
+## Docker Images Mastery
 
 ### Understanding Docker Images
 
@@ -377,7 +377,7 @@ docker diff <container_name>
 
 ---
 
-## Container Lifecycle Management {#container-lifecycle}
+## Container Lifecycle Management
 
 ### Container States
 
@@ -437,7 +437,7 @@ docker exec web df -h
 
 ---
 
-## Docker Networking Complete Guide {#docker-networking}
+## Docker Networking Complete Guide
 
 ### Network Drivers
 
@@ -567,7 +567,7 @@ docker run --network net1 --network net2 myapp
 
 ---
 
-## Data Persistence with Volumes {#docker-volumes}
+## Data Persistence with Volumes
 
 Containers are ephemeral - data is lost when containers are removed. Volumes provide persistent storage.
 
@@ -670,7 +670,7 @@ docker run --volumes-from web worker-image
 
 ---
 
-## Resource Management & Monitoring {#resource-management}
+## Resource Management & Monitoring
 
 ### Monitoring Containers
 
@@ -762,7 +762,7 @@ docker volume prune                   # Unused volumes
 
 ---
 
-## Docker Registries & Distribution {#docker-registries}
+## Docker Registries & Distribution
 
 ### Working with Docker Hub
 
@@ -838,7 +838,7 @@ docker exec registry bin/registry garbage-collect /etc/docker/registry/config.ym
 
 ---
 
-## Multi-Container Apps with Docker Compose {#docker-compose}
+## Multi-Container Apps with Docker Compose
 
 Docker Compose simplifies multi-container application management through YAML configuration.
 
@@ -982,7 +982,7 @@ networks:
 
 ---
 
-## Advanced Dockerfile Techniques {#advanced-dockerfile}
+## Advanced Dockerfile Techniques
 
 ### Dockerfile Best Practices
 
@@ -1128,7 +1128,7 @@ RUN ["echo", "Exec form - variables not expanded: $HOME"]
 
 ---
 
-## Production Best Practices {#production-best-practices}
+## Production Best Practices
 
 ### Security Best Practices
 
@@ -1189,14 +1189,23 @@ docker run -d --log-driver=syslog --log-opt syslog-address=tcp://logserver:514 n
 ```bash
 # Always set resource limits
 docker run -d \
-  --memory=512m \
-  --memory-swap=1g \
-  --cpus="1.0" \
-  --restart=unless-stopped \
-  myapp:latest
+  --name myapp \
+  --restart unless-stopped \
+  -p 8080:8080 \
+  -v myapp-data:/data \
+  -e DATABASE_URL=$DATABASE_URL \
+  --memory 512m \
+  --cpus 1.0 \
+  myapp:v1.0
 
-# Monitor resource usage
-docker stats --no-stream
+# Health monitoring
+docker run -d \
+  --name web \
+  --health-cmd="curl -f http://localhost:8080/health || exit 1" \
+  --health-interval=30s \
+  --health-timeout=10s \
+  --health-retries=3 \
+  myapp:latest
 ```
 
 ### Secrets Management
@@ -1215,7 +1224,7 @@ docker run -d \
 
 ---
 
-## Troubleshooting & Debugging {#troubleshooting}
+## Troubleshooting & Debugging
 
 ### Common Issues and Solutions
 
@@ -1300,7 +1309,7 @@ docker run --rm -it --pid container:target_container alpine ps aux
 docker run --rm -it --network container:target_container alpine netstat -tulpn
 
 # Check container resource constraints
-docker inspect container_name | grep -A 10 "Memory\|Cpu"
+docker inspect container_name | grep -A 10 "Memory\\|Cpu"
 
 # Debug Docker daemon
 sudo journalctl -u docker.service
@@ -1351,7 +1360,7 @@ docker stats --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.Net
 
 ---
 
-## Complete Command Reference {#command-reference}
+## Complete Command Reference
 
 ### Image Commands
 | Command | Description | Example |
