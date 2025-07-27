@@ -83,3 +83,32 @@ memory limit -->docker container update -m 100M container_name
 docker run -d --cpu-shares 512 image_name --cpu 1 --> cpu share is relative value,,1024 for 100%,here more shared container will get more CPU
 
 docker cp . dontainer_id:/app --> this is fo copy the files in docker container
+
+
+Docke networkng:
+
+bridge 
+host n
+none
+overlay
+mcvlan
+custom netwrok with user defined
+docker network create -d bridge/overlay network name 
+user defined bridge net can communicate with DNS name but default bridge network can commincate with only with ip address
+docker network connect ,disconnect network name
+docker network inspect netork_name
+
+
+Docker volumes:
+/var/lib/docker/volumes/
+docker volume create volume_name whichh will use the defualt folder for store data
+Named volumes which we create with a custom name like docker volume cfeate test_volume
+docker run -v /host/path:/container/path nginx
+
+docker run -v volume_name:container_pat image_name
+for mount
+docker run -d --name=test --mount source=volume_name,destination=data path in container image_name
+
+we can add more thing in mount where volume provide us a few options
+we can inpect a volume with docker inscpect volume name
+
