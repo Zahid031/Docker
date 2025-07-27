@@ -374,21 +374,6 @@ docker commit -m "Added custom config" <container_id> myubuntu:v1.0
 docker diff <container_name>
 ```
 
-### Advanced Image Management
-
-```bash
-# Multi-architecture images
-docker buildx build --platform linux/amd64,linux/arm64 -t myapp:latest .
-
-# Image vulnerability scanning
-docker scan myapp:latest
-
-# Analyze image layers
-docker image inspect --format='{{.RootFS.Layers}}' nginx
-
-# Clean up build cache
-docker builder prune
-```
 
 ---
 
