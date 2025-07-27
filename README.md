@@ -1,281 +1,227 @@
-# Docker Mastery Guide - From Scratch to Pro Level
+# Docker Mastery Guide - From Scratch to Pro Level 🐳
+
+Ready to master Docker? This guide is your one-stop-shop for getting up to speed with the essentials of containerization. Whether you're a developer, a DevOps engineer, or just curious about Docker, you'll find everything you need to get started and build a solid foundation.
 
 ## Table of Contents
-1. [Why Docker? Why Container-Based Software Delivery?](#why-docker)
-2. [Understanding the Container Landscape](#container-landscape)
-3. [Docker Architecture & Components](#docker-architecture)
-4. [Docker Under the Hood](#docker-under-the-hood)
-5. [Getting Started with Docker](#getting-started)
-6. [Working with Images](#working-with-images)
-7. [Container Lifecycle Management](#container-lifecycle)
-8. [Port Mapping & Networking](#port-mapping-networking)
-9. [Docker Networking Deep Dive](#docker-networking)
-10. [Data Persistence with Volumes](#docker-volumes)
-11. [Resource Management & Monitoring](#resource-management)
-12. [Docker Compose](#docker-compose)
-13. [Multi-Stage Builds](#multi-stage-builds)
-14. [Docker Security Best Practices](#security-best-practices)
-15. [Production Deployment Strategies](#production-deployment)
-16. [Troubleshooting & Debugging](#troubleshooting)
-17. [Advanced Topics](#advanced-topics)
+1. [Why Docker?](#why-docker)
+2. [Containers vs. Virtual Machines](#container-landscape)
+3. [Docker's Architecture](#docker-architecture)
+4. [The Magic Behind Docker](#docker-under-the-hood)
+5. [Getting Started: Essential Commands](#getting-started)
+6. [Managing Docker Images](#working-with-images)
+7. [The Container Lifecycle](#container-lifecycle)
+8. [Networking and Port Mapping](#port-mapping-networking)
+9. [Persisting Data with Volumes](#docker-volumes)
+10. [Managing Resources](#resource-management)
+11. [Multi-Container Applications with Docker Compose](#docker-compose)
+12. [Optimizing Images with Multi-Stage Builds](#multi-stage-builds)
+13. [Troubleshooting Common Issues](#troubleshooting)
+14. [Quick Reference: Command Cheat Sheet](#quick-reference-commands)
 
 ---
 
-## Why Docker? Why Container-Based Software Delivery? {#why-docker}
+## Why Docker? {#why-docker}
 
-### Problems Docker Solves
-- **"It works on my machine"** - Ensures consistent environments across development, testing, and production
-- **Dependency Hell** - Packages applications with all dependencies
-- **Resource Efficiency** - Lightweight compared to virtual machines
-- **Scalability** - Easy horizontal scaling and orchestration
-- **DevOps Integration** - Seamless CI/CD pipeline integration
-- **Microservices Architecture** - Perfect for breaking monoliths into services
+Docker makes software development and deployment a breeze by solving common problems:
 
-### Benefits of Container-Based Delivery
-- **Portability**: Run anywhere - dev laptop, test server, cloud
-- **Consistency**: Same environment across all stages
-- **Speed**: Fast startup times compared to VMs
-- **Resource Utilization**: Share OS kernel, use fewer resources
-- **Isolation**: Applications run in isolated environments
-- **Version Control**: Infrastructure as code
+-   **"It works on my machine!"**: Docker eliminates this classic issue by ensuring your application runs in the same environment, from your laptop to production servers.
+-   **Dependency Hell**: It neatly packages your application with all its dependencies, so you don't have to worry about conflicting versions.
+-   **Efficiency and Scalability**: Containers are lightweight and fast, making it easy to scale your applications up or down as needed.
+-   **DevOps and CI/CD**: Docker is a cornerstone of modern DevOps practices, enabling automated and consistent builds, tests, and deployments.
+-   **Microservices**: It's the perfect tool for building and managing applications based on a microservices architecture.
 
 ---
 
-## Understanding the Container Landscape {#container-landscape}
+## Containers vs. Virtual Machines {#container-landscape}
 
-### Bare Metal vs VMs vs Containers
+Here's a quick comparison to help you understand the key differences:
 
-| Aspect | Bare Metal | Virtual Machines | Containers |
-|--------|------------|------------------|------------|
-| **OS Overhead** | None | Full OS per VM | Shared OS kernel |
-| **Resource Usage** | Maximum | High | Minimal |
-| **Startup Time** | Boot time | Minutes | Seconds |
-| **Isolation** | Hardware | Complete | Process-level |
-| **Portability** | Limited | Good | Excellent |
-| **Density** | 1 app | Few VMs | Many containers |
+| Feature | Virtual Machines (VMs) | Containers |
+| :--- | :--- | :--- |
+| **OS** | Each VM has its own full OS | Share the host OS kernel |
+| **Size** | Heavy (Gigabytes) | Lightweight (Megabytes) |
+| **Startup** | Slow (Minutes) | Fast (Seconds) |
+| **Isolation** | Complete hardware isolation | Process-level isolation |
+| **Resources** | High consumption | Minimal consumption |
 
-**Key Difference**: VMs have their own kernel, containers share the host OS kernel.
+**The bottom line**: Containers are faster, more lightweight, and more efficient than VMs because they share the host's OS kernel.
 
 ---
 
-## Docker Architecture & Components {#docker-architecture}
+## Docker's Architecture {#docker-architecture}
 
-### Client-Server Architecture
-```
-Docker Client  <--REST API-->  Docker Daemon (dockerd)
-     |                              |
-     |                              |
-  Commands                    Container Runtime
-(docker run,                      |
-docker build,                containerd
-docker push)                      |
-                                 runc
-```
+Docker uses a client-server model:
 
-### Core Components
-- **Docker Client**: Command-line interface (CLI)
-- **Docker Daemon (dockerd)**: Server that manages images, containers, networks, volumes
-- **containerd**: High-level container runtime
-- **runc**: Low-level container runtime (OCI compliant)
-- **Docker Registry**: Storage for Docker images (Docker Hub, private registries)
+-   **Docker Client**: The command-line tool you use to interact with Docker.
+-   **Docker Daemon (dockerd)**: The background service that manages your containers, images, networks, and volumes.
+-   **Docker Registry**: A place to store and share your Docker images (Docker Hub is the most popular one).
 
-### System Information Commands
+You can get a quick overview of your Docker setup with these commands:
+
 ```bash
-# Get system information
+# Get high-level information about your Docker installation
 docker system info
 
-# Monitor system events (server-side logs)
-docker system events
-
-# Check resource usage
+# See how much space Docker is using
 docker system df
 
-# Clean up system resources
+# Clean up unused containers, images, and networks
 docker system prune
 ```
 
 ---
 
-## Docker Under the Hood {#docker-under-the-hood}
+## The Magic Behind Docker {#docker-under-the-hood}
 
-### Linux Namespaces
-Docker uses Linux namespaces for isolation:
-- **PID**: Process isolation
-- **NET**: Network isolation
-- **MNT**: Filesystem mount points
-- **UTS**: Hostname and domain name
-- **IPC**: Inter-process communication
-- **USER**: User and group IDs
+Docker relies on some powerful Linux features to work its magic:
 
-### Control Groups (cgroups)
-Resource control and monitoring:
-- **CPU**: Limit CPU usage
-- **Memory**: Control memory allocation
-- **Disk I/O**: Manage disk access
-- **Network**: Control network bandwidth
-
-### Union & Overlay Filesystem
-- **Layered Architecture**: Images are built in layers
-- **Copy-on-Write (COW)**: Containers share image layers, only changes are written
-- **Overlay2**: Default storage driver for efficient space usage
-- **Image Reuse**: When pulling images, only new/changed layers are downloaded
+-   **Namespaces**: These provide isolation for containers, ensuring that each container has its own separate environment (processes, network, filesystem, etc.).
+-   **Control Groups (cgroups)**: These limit and monitor the resources a container can use, such as CPU, memory, and disk I/O.
+-   **Union File System**: This allows Docker to build images in layers, making them efficient to store and share. When a container is created, it shares the image's layers, and any changes are written to a new, writable layer.
 
 ---
 
-## Getting Started with Docker {#getting-started}
+## Getting Started: Essential Commands {#getting-started}
 
-### Essential Commands
+Let's get our hands dirty with some of the most common Docker commands:
+
 ```bash
-# Pull an image from registry
+# Download an image from a registry (like Docker Hub)
+# Usage: docker pull <image_name>:<tag>
 docker pull nginx:latest
 
-# Create a container (without starting)
-docker create --name my-nginx nginx
+# Create a new container from an image (without starting it)
+# Usage: docker create --name <container_name> <image_name>
+docker create --name my-web-server nginx
 
-# Run a container
+# Run a container from an image
+# This command creates and starts a container in one step.
 docker run nginx
 
-# Run in interactive mode
+# Run a container in interactive mode to get a shell inside it
+# The -it flags connect your terminal to the container's terminal.
 docker run -it ubuntu bash
 
-# Run in detached mode
+# Run a container in detached mode (in the background)
+# The -d flag lets the container run without blocking your terminal.
 docker run -d nginx
 
-# Run with auto-removal after exit
-docker run -d --rm nginx
-
-# Stop a container
-docker stop container_name
+# Stop a running container
+docker stop my-web-server
 
 # Start a stopped container
-docker start container_name
-
-# Create image from running container
-docker commit container_id new_image:tag
+docker start my-web-server
 ```
 
-### Container Inspection & Logs
+### Inspecting Your Containers
+
+Once your containers are running, you'll need to see what's going on inside:
+
 ```bash
-# List running containers
+# List all running containers
 docker ps
 
-# List all containers (including stopped)
+# List all containers (including stopped ones)
 docker ps -a
 
-# Show last created container
-docker ps -l
+# View the logs of a container
+docker logs my-web-server
 
-# Show last n containers
-docker ps -n 2
+# Follow the logs in real-time (great for debugging)
+docker logs -f my-web-server
 
-# View container logs
-docker logs container_name
+# Get detailed information about a container (IP address, ports, etc.)
+docker inspect my-web-server
 
-# Follow logs in real-time
-docker logs -f container_name
-
-# Inspect container details
-docker inspect container_name
-
-# Execute command in running container
-docker exec -it container_name bash
-
-# See file changes in container
-docker diff container_name
+# Execute a command inside a running container
+# This is useful for debugging or running administrative tasks.
+docker exec -it my-web-server bash
 ```
 
 ---
 
-## Working with Images {#working-with-images}
+## Managing Docker Images {#working-with-images}
 
-### Image Management
+Images are the blueprints for your containers. Here's how to manage them:
+
 ```bash
-# List images
+# List all the images on your system
 docker images
 
-# View image history/layers
-docker history image_name
+# Build a new image from a Dockerfile
+# The -t flag tags the image with a name and optional tag.
+docker build -t my-custom-app:1.0 .
 
-# Remove image
-docker rmi image_name
+# Remove an image
+docker rmi my-custom-app:1.0
 
-# Remove dangling images
+# Remove all dangling images (untagged and unused)
 docker image prune
 
-# Build image from Dockerfile
-docker build -t image_name:tag .
-
-# Tag an image
-docker tag source_image:tag target_image:tag
-
-# Push image to registry
-docker push image_name:tag
+# Push an image to a registry (like Docker Hub)
+# You'll need to be logged in first (docker login).
+docker push your-username/my-custom-app:1.0
 ```
 
 ### Dockerfile Best Practices
+
+A `Dockerfile` is a script that contains instructions for building an image. Here are some tips for writing a great one:
+
 ```dockerfile
-# Use specific base image versions
+# Start with a minimal and specific base image
 FROM node:18-alpine
 
-# Set working directory
+# Set the working directory for your application
 WORKDIR /app
 
-# Copy package files first (for better caching)
+# Copy your package manager files and install dependencies first
+# This takes advantage of Docker's layer caching.
 COPY package*.json ./
-
-# Install dependencies
 RUN npm ci --only=production
 
-# Copy application code
+# Copy the rest of your application's code
 COPY . .
 
-# Expose port (documentation purposes)
+# Expose the port your application runs on (for documentation)
 EXPOSE 3000
 
-# Use non-root user
+# Run your container as a non-root user for better security
 USER node
 
-# Set entrypoint
+# Set the default command to run when the container starts
 CMD ["npm", "start"]
 ```
 
 ---
 
-## Container Lifecycle Management {#container-lifecycle}
+## The Container Lifecycle {#container-lifecycle}
 
-### Container States
-1. **Created**: Container exists but not started
-2. **Running**: Container is executing
-3. **Paused**: Container processes are paused
-4. **Stopped**: Container has exited
-5. **Deleted**: Container is removed
+Containers go through several states, and you can manage them with these commands:
 
-### Lifecycle Commands
 ```bash
-# Create container
-docker create --name web nginx
+# Create a container without starting it
+docker create --name my-app nginx
 
-# Start container
-docker start web
+# Start a container
+docker start my-app
 
-# Stop container (SIGTERM -> 10s -> SIGKILL)
-docker stop web
+# Stop a running container gracefully
+docker stop my-app
 
-# Kill container immediately (SIGKILL)
-docker kill web
+# Kill a container immediately
+docker kill my-app
 
-# Pause/Unpause container
-docker pause web
-docker unpause web
+# Pause a container's processes
+docker pause my-app
 
-# Remove container
-docker rm web
+# Unpause a container
+docker unpause my-app
 
-# Force remove running container
-docker rm -f web
+# Remove a container (it must be stopped first)
+docker rm my-app
 
-# Remove multiple containers
-docker rm container1 container2
+# Remove a running container by force
+docker rm -f my-app
 
 # Remove all stopped containers
 docker container prune
@@ -283,575 +229,153 @@ docker container prune
 
 ---
 
-## Port Mapping & Networking {#port-mapping-networking}
+## Networking and Port Mapping {#port-mapping-networking}
 
-### Port Mapping Options
+To access your applications running in containers, you'll need to map ports:
+
 ```bash
-# Map host port 8000 to container port 80
-docker run -p 8000:80 nginx
+# Map a port on your host to a port in the container
+# Format: -p <host_port>:<container_port>
+docker run -p 8080:80 nginx
 
-# Map random host port to container port 80
+# Let Docker choose a random available port on the host
 docker run -P nginx
-
-# Expose container port 80 to random host port
-docker run -p 80 nginx
-
-# Map to specific interface
-docker run -p 127.0.0.1:8000:80 nginx
-
-# Map multiple ports
-docker run -p 8000:80 -p 8443:443 nginx
 ```
 
-### Dockerfile Port Exposure
-```dockerfile
-# Expose ports (documentation - doesn't publish)
-EXPOSE 80 443
+Docker also provides different network drivers for various use cases. The `bridge` network is the default, but you can create your own custom networks for better isolation and service discovery.
 
-# When you expose ports in Dockerfile, Docker chooses random host ports
-# Use -P flag to publish all exposed ports to random host ports
+---
+
+## Persisting Data with Volumes {#docker-volumes}
+
+Containers are ephemeral, meaning their data is lost when they're removed. To persist data, you can use volumes:
+
+```bash
+# Create a named volume managed by Docker
+docker volume create my-app-data
+
+# Mount a named volume into a container
+docker run -v my-app-data:/data/db mongo
+
+# Mount a host directory into a container (a bind mount)
+# This is great for development, as changes on your host are reflected in the container.
+docker run -v /path/on/host:/app/code my-app
+
+# You can also use the --mount flag for a more explicit syntax
+docker run --mount source=my-app-data,target=/data/db mongo
 ```
 
 ---
 
-## Docker Networking Deep Dive {#docker-networking}
+## Managing Resources {#resource-management}
 
-### Network Types
-1. **bridge**: Default network for containers
-2. **host**: Container uses host's network stack
-3. **none**: No networking
-4. **overlay**: Multi-host networking (Docker Swarm)
-5. **macvlan**: Assign MAC address to container
+You can monitor and limit the resources your containers use:
 
-### Network Management
 ```bash
-# List networks
-docker network ls
-
-# Create custom network
-docker network create -d bridge my-network
-
-# Create overlay network
-docker network create -d overlay my-overlay
-
-# Inspect network
-docker network inspect my-network
-
-# Connect container to network
-docker network connect my-network container_name
-
-# Disconnect container from network
-docker network disconnect my-network container_name
-
-# Remove network
-docker network rm my-network
-
-# Remove unused networks
-docker network prune
-```
-
-### Bridge vs User-Defined Networks
-```bash
-# Default bridge network
-docker run -d --name web1 nginx
-docker run -d --name web2 nginx
-# Communication: Only via IP addresses
-
-# User-defined bridge network
-docker network create my-net
-docker run -d --name web1 --network my-net nginx
-docker run -d --name web2 --network my-net nginx
-# Communication: Via container names (DNS resolution)
-```
-
----
-
-## Data Persistence with Volumes {#docker-volumes}
-
-### Volume Types
-1. **Named Volumes**: Managed by Docker
-2. **Bind Mounts**: Host directory mounted into container
-3. **tmpfs Mounts**: Temporary filesystem in memory
-
-### Volume Management
-```bash
-# Create named volume
-docker volume create my-volume
-
-# List volumes
-docker volume ls
-
-# Inspect volume
-docker volume inspect my-volume
-
-# Remove volume
-docker volume rm my-volume
-
-# Remove unused volumes
-docker volume prune
-
-# Volume location on host
-# /var/lib/docker/volumes/
-```
-
-### Using Volumes
-```bash
-# Named volume
-docker run -v my-volume:/data nginx
-
-# Bind mount (absolute path required)
-docker run -v /host/path:/container/path nginx
-docker run -v $(pwd):/app nginx
-
-# Read-only bind mount
-docker run -v /host/path:/container/path:ro nginx
-
-# Using --mount (more explicit)
-docker run --mount source=my-volume,destination=/data nginx
-docker run --mount type=bind,source=/host/path,target=/container/path nginx
-```
-
-### Volume vs Mount Comparison
-| Feature | -v/--volume | --mount |
-|---------|-------------|---------|
-| Syntax | Compact | Verbose, explicit |
-| Bind mounts | Limited options | Full options |
-| Named volumes | Simple | Full control |
-| tmpfs | Not supported | Supported |
-
----
-
-## Resource Management & Monitoring {#resource-management}
-
-### Container Stats
-```bash
-# Real-time stats for all containers
+# Get a live stream of resource usage for your containers
 docker stats
 
-# Stats for specific containers
-docker stats container1 container2
+# Limit a container's memory usage
+docker run -m 512M my-app
 
-# One-time stats (no streaming)
-docker stats --no-stream
-
-# Detailed container stats
-docker container stats
-```
-
-### Resource Limits
-```bash
-# Memory limit
-docker run -m 512M nginx
-docker run --memory=1G nginx
-
-# Update memory limit for running container
-docker update -m 256M container_name
-
-# CPU limits
-docker run --cpus="1.5" nginx          # 1.5 CPU cores
-docker run --cpu-shares=512 nginx      # Relative CPU weight (default 1024)
-
-# Multiple resource limits
-docker run -m 512M --cpus="1" nginx
-```
-
-### File Operations
-```bash
-# Copy files to/from container
-docker cp file.txt container_id:/app/
-docker cp container_id:/app/file.txt ./
-
-# Copy entire directory
-docker cp ./src container_id:/app/
+# Limit a container's CPU usage
+docker run --cpus="1.5" my-app
 ```
 
 ---
 
-## Docker Compose {#docker-compose}
+## Multi-Container Applications with Docker Compose {#docker-compose}
 
-### What is Docker Compose?
-Tool for defining and running multi-container Docker applications using YAML files.
+Docker Compose is a tool for defining and running applications that use multiple containers (e.g., a web server, a database, and a caching service). You define your services in a `docker-compose.yml` file:
 
-### Basic docker-compose.yml
 ```yaml
 version: '3.8'
-
 services:
   web:
     build: .
     ports:
       - "8000:8000"
-    volumes:
-      - .:/app
-    environment:
-      - DEBUG=1
     depends_on:
       - db
-    networks:
-      - app-network
-
   db:
     image: postgres:13
     environment:
-      - POSTGRES_DB=myapp
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - app-network
-
-volumes:
-  postgres_data:
-
-networks:
-  app-network:
-    driver: bridge
+      POSTGRES_DB: myapp
 ```
 
-### Compose Commands
+Then, you can manage your entire application stack with a few simple commands:
+
 ```bash
-# Start services
+# Start all the services defined in your docker-compose.yml file
 docker-compose up
 
-# Start in detached mode
+# Start the services in detached mode
 docker-compose up -d
 
-# Build and start
-docker-compose up --build
-
-# Stop services
+# Stop all the services
 docker-compose down
-
-# Stop and remove volumes
-docker-compose down -v
-
-# View logs
-docker-compose logs
-
-# Scale services
-docker-compose up --scale web=3
-
-# Execute command in service
-docker-compose exec web bash
-
-# View running services
-docker-compose ps
 ```
 
 ---
 
-## Multi-Stage Builds {#multi-stage-builds}
+## Optimizing Images with Multi-Stage Builds {#multi-stage-builds}
 
-### Why Multi-Stage Builds?
-- Reduce final image size
-- Separate build and runtime environments
-- Security: Don't include build tools in production
+Multi-stage builds are a powerful feature for creating smaller, more secure production images. You use multiple `FROM` instructions in your Dockerfile, and you can copy artifacts from one stage to another, leaving behind any build tools or intermediate files.
 
-### Example Multi-Stage Dockerfile
 ```dockerfile
-# Build stage
+# Stage 1: Build the application
 FROM node:18-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-
-# Production stage
-FROM nginx:alpine AS production
-COPY --from=builder /app/dist /usr/share/nginx/html
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
-
-# Development stage
-FROM node:18-alpine AS development
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
-EXPOSE 3000
-CMD ["npm", "run", "dev"]
-```
+RUN npm run build
 
-### Building Specific Stages
-```bash
-# Build production stage
-docker build --target production -t myapp:prod .
-
-# Build development stage
-docker build --target development -t myapp:dev .
+# Stage 2: Create the final production image
+FROM nginx:alpine
+COPY --from=builder /app/build /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
 ```
 
 ---
 
-## Docker Security Best Practices {#security-best-practices}
+## Troubleshooting Common Issues {#troubleshooting}
 
-### Image Security
-```dockerfile
-# Use official, minimal base images
-FROM node:18-alpine
+If you run into problems, these commands are your best friends:
 
-# Don't run as root
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nextjs -u 1001
-USER nextjs
-
-# Use specific versions
-FROM node:18.17.0-alpine
-
-# Scan for vulnerabilities
-# docker scan image_name
-```
-
-### Runtime Security
 ```bash
-# Run with read-only filesystem
-docker run --read-only nginx
+# If a container exits unexpectedly, check its logs
+docker logs <container_name>
 
-# Drop capabilities
-docker run --cap-drop=ALL --cap-add=NET_BIND_SERVICE nginx
+# If you have network issues, inspect the network settings
+docker network inspect <network_name>
 
-# Use security profiles
-docker run --security-opt seccomp=default.json nginx
+# If you have port conflicts, see which container is using a port
+docker port <container_name>
 
-# Limit resources
-docker run -m 512M --cpus="0.5" nginx
-```
-
-### Secrets Management
-```bash
-# Use Docker secrets (Swarm mode)
-echo "my-secret" | docker secret create my-secret -
-
-# Use environment files
-docker run --env-file .env nginx
-
-# Avoid secrets in Dockerfile
-# DON'T: ENV PASSWORD=secret
-# DO: Mount secrets at runtime
+# For everything else, inspect the container's configuration
+docker inspect <container_name>
 ```
 
 ---
 
-## Production Deployment Strategies {#production-deployment}
+## Quick Reference: Command Cheat Sheet {#quick-reference-commands}
 
-### Health Checks
-```dockerfile
-# Dockerfile health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost/ || exit 1
-```
+Here are some of the most frequently used commands in one place:
 
-```bash
-# Runtime health check
-docker run -d --health-cmd="curl -f http://localhost/" \
-  --health-interval=30s --health-timeout=3s --health-retries=3 nginx
-```
-
-### Logging
-```bash
-# Configure log driver
-docker run --log-driver=json-file --log-opt max-size=10m --log-opt max-file=3 nginx
-
-# Use centralized logging
-docker run --log-driver=syslog --log-opt syslog-address=udp://logserver:514 nginx
-```
-
-### Restart Policies
-```bash
-# Always restart
-docker run --restart=always nginx
-
-# Restart on failure
-docker run --restart=on-failure:3 nginx
-
-# Restart unless stopped
-docker run --restart=unless-stopped nginx
-```
-
----
-
-## Troubleshooting & Debugging {#troubleshooting}
-
-### Common Issues & Solutions
-```bash
-# Container exits immediately
-docker logs container_name
-docker run -it image_name bash  # Debug interactively
-
-# Permission issues
-docker exec -it container_name ls -la /path
-# Fix: Adjust file permissions or user context
-
-# Network connectivity issues
-docker network ls
-docker network inspect bridge
-docker exec -it container_name ping other_container
-
-# Resource issues
-docker stats
-docker system df
-docker system events
-
-# Port conflicts
-netstat -tulpn | grep :port
-docker port container_name
-```
-
-### Debugging Commands
-```bash
-# Enter container for debugging
-docker exec -it container_name bash
-
-# Check container processes
-docker top container_name
-
-# Monitor resource usage
-docker stats container_name
-
-# Inspect container configuration
-docker inspect container_name
-
-# View container filesystem changes
-docker diff container_name
-
-# Export container filesystem
-docker export container_name > container.tar
-```
-
----
-
-## Advanced Topics {#advanced-topics}
-
-### Docker Registry
-```bash
-# Login to registry
-docker login registry.example.com
-
-# Push to private registry
-docker tag myapp:latest registry.example.com/myapp:latest
-docker push registry.example.com/myapp:latest
-
-# Run local registry
-docker run -d -p 5000:5000 --name registry registry:2
-```
-
-### Docker Swarm (Orchestration)
-```bash
-# Initialize swarm
-docker swarm init
-
-# Join swarm as worker
-docker swarm join --token TOKEN manager-ip:2377
-
-# Deploy stack
-docker stack deploy -c docker-compose.yml mystack
-
-# Scale service
-docker service scale mystack_web=3
-```
-
-### Performance Optimization
-```bash
-# Use BuildKit for faster builds
-export DOCKER_BUILDKIT=1
-docker build .
-
-# Multi-platform builds
-docker buildx build --platform linux/amd64,linux/arm64 -t myapp .
-
-# Use cache mounts
-RUN --mount=type=cache,target=/var/cache/apt apt-get update
-```
-
-### Container Orchestration Alternatives
-- **Kubernetes**: Production-grade orchestration
-- **Docker Swarm**: Docker's native orchestration
-- **Amazon ECS**: AWS container service
-- **Google Cloud Run**: Serverless containers
-
----
-
-## Quick Reference Commands
-
-### Most Used Commands
-```bash
-# Images
-docker pull image
-docker build -t name .
-docker images
-docker rmi image
-
-# Containers
-docker run -d image
-docker ps
-docker stop container
-docker rm container
-
-# Logs & Debug
-docker logs container
-docker exec -it container bash
-docker inspect container
-
-# Cleanup
-docker system prune
-docker container prune
-docker image prune
-docker volume prune
-```
-
-### Dockerfile Instructions
-```dockerfile
-FROM          # Base image
-WORKDIR       # Set working directory
-COPY/ADD      # Copy files
-RUN           # Execute commands
-EXPOSE        # Document ports
-ENV           # Environment variables
-USER          # Set user context
-CMD           # Default command
-ENTRYPOINT    # Entry point
-VOLUME        # Mount point
-HEALTHCHECK   # Health check
-```
-
----
-
-## Learning Path Recommendations
-
-### Beginner (Weeks 1-2)
-- Understand containers vs VMs
-- Learn basic Docker commands
-- Create simple Dockerfiles
-- Work with volumes and networking
-
-### Intermediate (Weeks 3-4)
-- Master Docker Compose
-- Implement multi-stage builds
-- Learn security best practices
-- Practice troubleshooting
-
-### Advanced (Weeks 5-8)
-- Container orchestration (Kubernetes)
-- CI/CD integration
-- Performance optimization
-- Production deployment strategies
-
-### Expert Level
-- Custom network drivers
-- Storage drivers
-- Docker plugin development
-- Contributing to Docker ecosystem
-
----
-
-**Remember**: Practice is key! Set up a local development environment and experiment with these concepts. Start with simple applications and gradually work your way up to complex multi-service architectures.
-
-**Next Steps**: 
-1. Set up a multi-tier application with Docker Compose
-2. Implement CI/CD pipeline with Docker
-3. Learn Kubernetes for production orchestration
-4. Explore cloud-native technologies (service mesh, observability)
+| Command | Description |
+| :--- | :--- |
+| `docker pull <image>` | Download an image |
+| `docker build -t <name> .` | Build an image from a Dockerfile |
+| `docker images` | List all images |
+| `docker rmi <image>` | Remove an image |
+| `docker run <image>` | Create and start a container |
+| `docker ps` | List running containers |
+| `docker stop <container>` | Stop a container |
+| `docker rm <container>` | Remove a container |
+| `docker logs <container>` | View a container's logs |
+| `docker exec -it <container> bash` | Get a shell inside a container |
+| `docker system prune` | Clean up your system |
 
 Happy Dockerizing! 🐳
