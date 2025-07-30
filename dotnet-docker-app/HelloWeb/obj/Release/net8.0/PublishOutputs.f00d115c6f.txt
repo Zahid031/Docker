@@ -1,0 +1,7 @@
+/home/zahid/Technonext/WorkSpace1/Docker/dotnet-docker-app/HelloWeb/bin/Release/net8.0/publish/HelloWeb
+/home/zahid/Technonext/WorkSpace1/Docker/dotnet-docker-app/HelloWeb/bin/Release/net8.0/publish/appsettings.Development.json
+/home/zahid/Technonext/WorkSpace1/Docker/dotnet-docker-app/HelloWeb/bin/Release/net8.0/publish/appsettings.json
+/home/zahid/Technonext/WorkSpace1/Docker/dotnet-docker-app/HelloWeb/bin/Release/net8.0/publish/HelloWeb.dll
+/home/zahid/Technonext/WorkSpace1/Docker/dotnet-docker-app/HelloWeb/bin/Release/net8.0/publish/HelloWeb.deps.json
+/home/zahid/Technonext/WorkSpace1/Docker/dotnet-docker-app/HelloWeb/bin/Release/net8.0/publish/HelloWeb.runtimeconfig.json
+/home/zahid/Technonext/WorkSpace1/Docker/dotnet-docker-app/HelloWeb/bin/Release/net8.0/publish/HelloWeb.pdb
