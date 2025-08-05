@@ -1,4 +1,4 @@
-# Complete Docker Mastery Guide - Zero to Hero 🐳
+# Complete Docker Mastery Guide 
 
 Welcome to the most comprehensive Docker guide you'll find! This guide covers everything from basic concepts to advanced techniques, making you a Docker expert ready for any real-world scenario.
 
