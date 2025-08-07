@@ -41,8 +41,8 @@ services:
 
   redis:
     image: redis:alpine
-    ports:
-      - "6379:6379"
+    # ports:
+    #   - "6379:6379"
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:9.0.2
@@ -54,8 +54,8 @@ services:
       - xpack.security.enabled=true
       - xpack.security.authc.api_key.enabled=true
       - "ES_JAVA_OPTS=-Xms128m -Xmx2g"
-    ports:
-      - "9200:9200"
+    # ports:
+    #   - "9200:9200"
     volumes:
       - esdata:/usr/share/elasticsearch/data
     ulimits:
@@ -67,3 +67,4 @@ services:
 
 volumes:
   esdata:
+  
