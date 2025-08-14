@@ -1,0 +1,11 @@
+Django
+djangorestframework
+django-cors-headers
+psycopg2-binary
+asgiref==3.9.1
+Django==5.2.5
+django-cors-headers==4.7.0
+djangorestframework==3.16.1
+kafka-python==2.2.15
+psycopg2-binary==2.9.10
+sqlparse==0.5.3
