@@ -1,6 +1,5 @@
 package rabbitmq
 
-
 import (
 	"encoding/json"
 	"log"
@@ -30,94 +29,223 @@ type Task struct {
 }
 
 type Consumer struct {
-	conn    *amqp.Connection
-	channel *amqp.Channel
-	db      *gorm.DB
+	rabbitmqURL string
+	db          *gorm.DB
+	conn        *amqp.Connection
+	channel     *amqp.Channel
+	done        chan bool
+	reconnect   chan bool
 }
 
 func NewConsumer(rabbitmqURL string, db *gorm.DB) (*Consumer, error) {
-	conn, err := amqp.Dial(rabbitmqURL)
+	consumer := &Consumer{
+		rabbitmqURL: rabbitmqURL,
+		db:          db,
+		done:        make(chan bool),
+		reconnect:   make(chan bool),
+	}
+
+	err := consumer.connect()
 	if err != nil {
 		return nil, err
 	}
 
-	ch, err := conn.Channel()
-	if err != nil {
-		conn.Close()
-		return nil, err
-	}
-
-	return &Consumer{
-		conn:    conn,
-		channel: ch,
-		db:      db,
-	}, nil
+	return consumer, nil
 }
 
-func (c *Consumer) StartConsuming() error {
-	// Declare the queue
-	_, err := c.channel.QueueDeclare(
+func (c *Consumer) connect() error {
+	var err error
+	
+	// Configure connection with heartbeat settings
+	config := amqp.Config{
+		Heartbeat: 30 * time.Second,  // Reduced heartbeat interval
+		Locale:    "en_US",
+		Dial: amqp.DefaultDial(30 * time.Second), // Connection timeout
+	}
+
+	c.conn, err = amqp.DialConfig(c.rabbitmqURL, config)
+	if err != nil {
+		return err
+	}
+
+	c.channel, err = c.conn.Channel()
+	if err != nil {
+		c.conn.Close()
+		return err
+	}
+
+	// Set QoS to limit unacknowledged messages
+	err = c.channel.Qos(
+		10,    // prefetch count
+		0,     // prefetch size
+		false, // global
+	)
+	if err != nil {
+		c.channel.Close()
+		c.conn.Close()
+		return err
+	}
+
+	// Declare the queue with proper settings
+	_, err = c.channel.QueueDeclare(
 		"task_service_queue", // name
 		true,                 // durable
 		false,                // delete when unused
 		false,                // exclusive
 		false,                // no-wait
-		nil,                  // arguments
+		amqp.Table{
+			"x-message-ttl": 300000, // 5 minutes TTL
+		},
 	)
 	if err != nil {
+		c.channel.Close()
+		c.conn.Close()
 		return err
 	}
 
-	// Start consuming messages
+	// Listen for connection close events
+	go c.watchConnection()
+
+	log.Println("Connected to RabbitMQ successfully")
+	return nil
+}
+
+func (c *Consumer) watchConnection() {
+	notifyConnClose := make(chan *amqp.Error)
+	notifyChannelClose := make(chan *amqp.Error)
+	
+	c.conn.NotifyClose(notifyConnClose)
+	c.channel.NotifyClose(notifyChannelClose)
+
+	select {
+	case err := <-notifyConnClose:
+		if err != nil {
+			log.Printf("Connection closed: %v", err)
+		}
+		c.reconnect <- true
+	case err := <-notifyChannelClose:
+		if err != nil {
+			log.Printf("Channel closed: %v", err)
+		}
+		c.reconnect <- true
+	case <-c.done:
+		return
+	}
+}
+
+func (c *Consumer) StartConsuming() error {
+	for {
+		select {
+		case <-c.done:
+			log.Println("Consumer stopped")
+			return nil
+		case <-c.reconnect:
+			log.Println("Attempting to reconnect to RabbitMQ...")
+			c.cleanup()
+			
+			// Wait before reconnecting
+			time.Sleep(5 * time.Second)
+			
+			err := c.connect()
+			if err != nil {
+				log.Printf("Failed to reconnect: %v", err)
+				time.Sleep(10 * time.Second)
+				c.reconnect <- true // Try again
+				continue
+			}
+			
+			// Start consuming again
+			go c.consume()
+		default:
+			// Start initial consumption
+			go c.consume()
+			
+			// Block until we need to reconnect or stop
+			select {
+			case <-c.reconnect:
+				continue
+			case <-c.done:
+				return nil
+			}
+		}
+	}
+}
+
+func (c *Consumer) consume() {
 	msgs, err := c.channel.Consume(
 		"task_service_queue", // queue
-		"",                   // consumer
-		true,                 // auto-ack
+		"task-consumer",      // consumer tag
+		false,                // auto-ack (set to false for manual ack)
 		false,                // exclusive
 		false,                // no-local
 		false,                // no-wait
 		nil,                  // args
 	)
 	if err != nil {
-		return err
+		log.Printf("Failed to register consumer: %v", err)
+		c.reconnect <- true
+		return
 	}
 
-	log.Println("RabbitMQ consumer started, waiting for messages...")
+	log.Println("Consumer started, waiting for messages...")
 
-	go func() {
-		for d := range msgs {
-			c.handleUserEvent(d.RoutingKey, d.Body)
+	for {
+		select {
+		case d, ok := <-msgs:
+			if !ok {
+				log.Println("Message channel closed")
+				c.reconnect <- true
+				return
+			}
+			
+			// Process message with timeout
+			go func(delivery amqp.Delivery) {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Printf("Panic in message handler: %v", r)
+						delivery.Nack(false, true) // Requeue on panic
+					}
+				}()
+				
+				err := c.handleUserEvent(delivery.RoutingKey, delivery.Body)
+				if err != nil {
+					log.Printf("Failed to handle message: %v", err)
+					delivery.Nack(false, true) // Requeue on error
+				} else {
+					delivery.Ack(false) // Acknowledge successful processing
+				}
+			}(d)
+			
+		case <-c.done:
+			return
 		}
-	}()
-
-	return nil
+	}
 }
 
-func (c *Consumer) handleUserEvent(routingKey string, body []byte) {
-	log.Printf("Received message: %s - %s", routingKey, string(body))
+func (c *Consumer) handleUserEvent(routingKey string, body []byte) error {
+	log.Printf("Processing message: %s - %s", routingKey, string(body))
 
 	var event UserEvent
 	if err := json.Unmarshal(body, &event); err != nil {
 		log.Printf("Failed to unmarshal event: %v", err)
-		return
+		return err
 	}
 
 	switch routingKey {
 	case "user.created":
-		c.handleUserCreated(event)
+		return c.handleUserCreated(event)
 	case "user.updated":
-		c.handleUserUpdated(event)
+		return c.handleUserUpdated(event)
 	case "user.deleted":
-		c.handleUserDeleted(event)
+		return c.handleUserDeleted(event)
 	default:
 		log.Printf("Unknown routing key: %s", routingKey)
+		return nil
 	}
 }
 
-func (c *Consumer) handleUserCreated(event UserEvent) {
+func (c *Consumer) handleUserCreated(event UserEvent) error {
 	log.Printf("User created: %d - %s", event.UserID, event.Name)
-	// You can perform any task-related actions here when a user is created
-	// For example, create a welcome task for the new user
 	
 	welcomeTask := Task{
 		Title:       "Welcome to Todo App!",
@@ -128,34 +256,41 @@ func (c *Consumer) handleUserCreated(event UserEvent) {
 	
 	if err := c.db.Create(&welcomeTask).Error; err != nil {
 		log.Printf("Failed to create welcome task for user %d: %v", event.UserID, err)
-	} else {
-		log.Printf("Created welcome task for user %d", event.UserID)
+		return err
 	}
+	
+	log.Printf("Created welcome task for user %d", event.UserID)
+	return nil
 }
 
-func (c *Consumer) handleUserUpdated(event UserEvent) {
+func (c *Consumer) handleUserUpdated(event UserEvent) error {
 	log.Printf("User updated: %d - %s", event.UserID, event.Name)
-	// Handle user updates if needed
-	// For example, you could update task metadata or send notifications
+	return nil
 }
 
-func (c *Consumer) handleUserDeleted(event UserEvent) {
+func (c *Consumer) handleUserDeleted(event UserEvent) error {
 	log.Printf("User deleted: %d", event.UserID)
 	
-	// Delete all tasks for this user
 	result := c.db.Where("user_id = ?", event.UserID).Delete(&Task{})
 	if result.Error != nil {
 		log.Printf("Failed to delete tasks for user %d: %v", event.UserID, result.Error)
-	} else {
-		log.Printf("Deleted %d tasks for user %d", result.RowsAffected, event.UserID)
+		return result.Error
 	}
+	
+	log.Printf("Deleted %d tasks for user %d", result.RowsAffected, event.UserID)
+	return nil
 }
 
-func (c *Consumer) Close() {
+func (c *Consumer) cleanup() {
 	if c.channel != nil {
 		c.channel.Close()
 	}
 	if c.conn != nil {
 		c.conn.Close()
 	}
+}
+
+func (c *Consumer) Close() {
+	close(c.done)
+	c.cleanup()
 }

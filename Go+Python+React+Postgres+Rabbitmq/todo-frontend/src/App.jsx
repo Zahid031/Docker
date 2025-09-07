@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 
-const API_USERS = 'http://localhost:8000/api/users';
-const API_TASKS = 'http://localhost:8001/api/tasks';
+const API_USERS = 'http://192.168.121.79:30000/api/users';
+const API_TASKS = 'http://192.168.121.79:30001/api/tasks';
+
+// const API_USERS = import.meta.env.VITE_API_USERS || 'http://localhost:8000/api/users';
+// const API_TASKS = import.meta.env.VITE_API_TASKS || 'http://localhost:8001/api/tasks';
+
 
 function App() {
   const [users, setUsers] = useState([]);

@@ -4,7 +4,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -28,6 +30,7 @@ type Task struct {
 
 var db *gorm.DB
 var taskPublisher *rabbitmq.Publisher
+var consumer *rabbitmq.Consumer
 
 func main() {
 	// Database connection
@@ -48,7 +51,7 @@ func main() {
 	// Setup RabbitMQ
 	rabbitmqURL := os.Getenv("RABBITMQ_URL")
 	if rabbitmqURL == "" {
-		rabbitmqURL = "amqp://admin:admin123@localhost:5672/"
+		rabbitmqURL = "amqp://admin:admin123@rabbitmq:5672/" // Use service name
 	}
 
 	// Wait for RabbitMQ to be ready
@@ -63,15 +66,22 @@ func main() {
 	}
 
 	// Initialize and start RabbitMQ consumer
-	consumer, err := rabbitmq.NewConsumer(rabbitmqURL, db)
+	consumer, err = rabbitmq.NewConsumer(rabbitmqURL, db)
 	if err != nil {
 		log.Printf("Failed to initialize RabbitMQ consumer: %v", err)
 	} else {
-		err = consumer.StartConsuming()
-		if err != nil {
-			log.Printf("Failed to start RabbitMQ consumer: %v", err)
-		}
+		go func() {
+			err = consumer.StartConsuming()
+			if err != nil {
+				log.Printf("RabbitMQ consumer error: %v", err)
+			}
+		}()
+		log.Println("RabbitMQ consumer started successfully")
 	}
+
+	// Setup graceful shutdown
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 
 	// Setup Gin router
 	r := gin.Default()
@@ -113,8 +123,27 @@ func main() {
 		port = "8001"
 	}
 
-	log.Printf("Task service starting on port %s", port)
-	r.Run(":" + port)
+	// Start server in a goroutine
+	go func() {
+		log.Printf("Task service starting on port %s", port)
+		if err := r.Run(":" + port); err != nil {
+			log.Printf("Server error: %v", err)
+		}
+	}()
+
+	// Wait for interrupt signal to gracefully shutdown
+	<-c
+	log.Println("Shutting down...")
+
+	// Cleanup
+	if consumer != nil {
+		consumer.Close()
+	}
+	if taskPublisher != nil {
+		taskPublisher.Close()
+	}
+
+	log.Println("Shutdown complete")
 }
 
 func waitForRabbitMQ(rabbitmqURL string) {
@@ -126,7 +155,7 @@ func waitForRabbitMQ(rabbitmqURL string) {
 			log.Println("RabbitMQ is ready")
 			return
 		}
-		log.Printf("Waiting for RabbitMQ... (%d/%d)", i+1, maxRetries)
+		log.Printf("Waiting for RabbitMQ... (%d/%d): %v", i+1, maxRetries, err)
 		time.Sleep(2 * time.Second)
 	}
 	log.Println("RabbitMQ connection timeout, continuing anyway...")
@@ -134,7 +163,11 @@ func waitForRabbitMQ(rabbitmqURL string) {
 
 func getTasks(c *gin.Context) {
 	var tasks []Task
-	db.Find(&tasks)
+	result := db.Find(&tasks)
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, tasks)
 }
 
@@ -164,6 +197,8 @@ func createTask(c *gin.Context) {
 		err := taskPublisher.PublishTaskEvent("task.created", taskEvent)
 		if err != nil {
 			log.Printf("Failed to publish task.created event: %v", err)
+		} else {
+			log.Printf("Published task.created event for task %d", task.ID)
 		}
 	}
 
@@ -175,7 +210,11 @@ func getTask(c *gin.Context) {
 	var task Task
 
 	if result := db.First(&task, id); result.Error != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		if result.Error == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+		}
 		return
 	}
 
@@ -187,7 +226,11 @@ func updateTask(c *gin.Context) {
 	var task Task
 
 	if result := db.First(&task, id); result.Error != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		if result.Error == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+		}
 		return
 	}
 
@@ -197,7 +240,14 @@ func updateTask(c *gin.Context) {
 		return
 	}
 
-	db.Model(&task).Updates(updateData)
+	// Update the task
+	if result := db.Model(&task).Updates(updateData); result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+		return
+	}
+
+	// Refresh the task data from database to get updated timestamp
+	db.First(&task, id)
 
 	// Publish task updated event
 	if taskPublisher != nil {
@@ -213,6 +263,8 @@ func updateTask(c *gin.Context) {
 		err := taskPublisher.PublishTaskEvent("task.updated", taskEvent)
 		if err != nil {
 			log.Printf("Failed to publish task.updated event: %v", err)
+		} else {
+			log.Printf("Published task.updated event for task %d", task.ID)
 		}
 	}
 
@@ -224,7 +276,11 @@ func deleteTask(c *gin.Context) {
 	var task Task
 
 	if result := db.First(&task, id); result.Error != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		if result.Error == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+		}
 		return
 	}
 
@@ -238,17 +294,23 @@ func deleteTask(c *gin.Context) {
 		DeletedAt:   time.Now(),
 	}
 
-	db.Delete(&task)
+	// Delete the task
+	if result := db.Delete(&task); result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+		return
+	}
 
 	// Publish task deleted event
 	if taskPublisher != nil {
 		err := taskPublisher.PublishTaskEvent("task.deleted", taskEvent)
 		if err != nil {
 			log.Printf("Failed to publish task.deleted event: %v", err)
+		} else {
+			log.Printf("Published task.deleted event for task %d", task.ID)
 		}
 	}
 
-	c.JSON(http.StatusNoContent, nil)
+	c.JSON(http.StatusOK, gin.H{"message": "Task deleted successfully"})
 }
 
 func getTasksByUser(c *gin.Context) {
@@ -260,6 +322,11 @@ func getTasksByUser(c *gin.Context) {
 	}
 
 	var tasks []Task
-	db.Where("user_id = ?", userIDInt).Find(&tasks)
+	result := db.Where("user_id = ?", userIDInt).Find(&tasks)
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+		return
+	}
+
 	c.JSON(http.StatusOK, tasks)
 }

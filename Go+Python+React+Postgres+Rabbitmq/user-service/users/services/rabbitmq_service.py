@@ -53,8 +53,12 @@ class RabbitMQPublisher:
                 durable=True
             )
             
-            # Declare queue for task service
-            self.channel.queue_declare(queue='task_service_queue', durable=True)
+            # Declare queue for task service with the same TTL as existing queue
+            self.channel.queue_declare(
+                queue='task_service_queue',
+                durable=True,
+                arguments={'x-message-ttl': 300000}  # Match existing TTL
+            )
             self.channel.queue_bind(
                 exchange='user_events',
                 queue='task_service_queue',
@@ -65,6 +69,7 @@ class RabbitMQPublisher:
         except Exception as e:
             logger.error(f"Failed to connect to RabbitMQ: {e}")
             raise
+
 
     def publish_event(self, routing_key, message):
         """Publish an event to RabbitMQ"""
