@@ -1,0 +1,64 @@
+FROM eclipse-temurin:21-jre-alpine AS apm-downloader
+ARG ELASTIC_APM_AGENT_VERSION=1.53.0
+RUN apk add --no-cache ca-certificates
+ADD https://repo1.maven.org/maven2/co/elastic/apm/elastic-apm-agent/${ELASTIC_APM_AGENT_VERSION}/elastic-apm-agent-${ELASTIC_APM_AGENT_VERSION}.jar /elastic-apm-agent.jar
+
+# Base image for the build stage
+FROM eclipse-temurin:21-jdk-jammy AS builder
+
+WORKDIR /build
+
+# Copy only necessary files for the build process
+COPY gradlew build.gradle settings.gradle ./
+COPY gradle/ gradle/
+
+# Pre-download dependencies
+RUN ./gradlew dependencies --no-daemon
+
+# Copy source
+COPY src ./src
+
+# Build Spring Boot JAR
+RUN ./gradlew clean build -x test --no-daemon
+
+# ------------------------
+# Runtime stage
+# ------------------------
+FROM eclipse-temurin:21-jre-alpine
+
+# Install required packages + glibc compatibility for Snappy
+RUN apk update && apk add --no-cache busybox-extras curl libc6-compat
+
+# Create a non-root user for better security
+RUN addgroup dravoogroup && adduser --ingroup dravoogroup --disabled-password dravooapp
+
+# Set the working directory for the runtime container
+WORKDIR /app
+
+# Copy the built JAR from the builder stage
+COPY --from=builder /build/build/libs/*.jar app.jar
+
+COPY --from=apm-downloader /elastic-apm-agent.jar /app/elastic-apm-agent.jar
+
+# Create directory for any needed volume mounts with proper permissions
+RUN mkdir -p /app/logs && chown -R dravooapp:dravoogroup /app
+
+# Switch to non-root user
+USER dravooapp
+
+EXPOSE 8080
+
+# Environment
+ENV SPRING_PROFILES_ACTIVE=dev
+
+# Set the entrypoint to run the Spring Boot application with the environment variable
+ENTRYPOINT ["java","-XX:+UseContainerSupport", \
+    "-XX:InitialRAMPercentage=50.0", \
+    "-XX:MaxRAMPercentage=70.0", \
+    "-XX:+UseG1GC", \
+    "-XX:MaxGCPauseMillis=200", \
+    "-XX:+UseStringDeduplication", \
+    "-XX:+HeapDumpOnOutOfMemoryError", \
+    "-javaagent:/app/elastic-apm-agent.jar", \
+    "-jar", "app.jar", \
+    "--spring.profiles.active=${SPRING_PROFILES_ACTIVE}"]
